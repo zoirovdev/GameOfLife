@@ -1,11 +1,14 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <stdlib.h>
+#include <time.h>
+#include <string.h>
 
-#define WIDTH 25
+
+#define WIDTH 50
 #define HEIGHT 25
 #define BACKGROUND '-'
-#define CELL '#'
+#define CELL 'E'
 #define SPEED 50
 
 typedef enum {
@@ -19,9 +22,13 @@ typedef struct {
 
 Cell grid[HEIGHT][WIDTH] = {0};
 
-void init_grid(){
+void init_grid(int random){
 	for(size_t i=0;i<HEIGHT;i++){
 		for(size_t j=0;j<WIDTH;j++){
+			if(rand()%2 == 0 && random == 1){
+				grid[i][j].state = ALIVE;
+				continue;
+			}
 			grid[i][j].state=DEAD;
 		}
 	}
@@ -29,34 +36,45 @@ void init_grid(){
 
 
 void gen_next(){
+	Cell new_grid[HEIGHT][WIDTH] = {0};
+	for(size_t i=0; i<HEIGHT; i++){
+		for(size_t j=0; j<WIDTH; j++){
+			new_grid[i][j] = grid[i][j];
+		}
+	}
 	for(size_t i=0;i<HEIGHT;i++){
 		for(size_t j=0;j<WIDTH;j++){
 			int alive_count = 0;
 			for(int k=-1; k<=1; k++){
 				for(int l=-1; l<=1; l++){
 					if(k==0 && l==0) continue;
-					if(i+k <= HEIGHT && (int)i+k >= 0 && j+l <= WIDTH && (int)j+l >= 0){
-						if(grid[i+k][j+l].state == ALIVE){
-							alive_count++;
-						}
+					int row = (i+k+HEIGHT) % HEIGHT;
+					int col = (j+l+WIDTH) % WIDTH;
+					if(grid[row][col].state == ALIVE){
+						alive_count++;
 					}
 				}
 			}
 			switch(alive_count){
 				case 0:
 				case 1:
-					grid[i][j].state = DEAD;
+					new_grid[i][j].state = DEAD;
 					break;
 				case 2:
 				case 3:
 					if(grid[i][j].state == DEAD && alive_count == 3){
-						grid[i][j].state = ALIVE;
+						new_grid[i][j].state = ALIVE;
 					}
 					break;
 				default:
-					grid[i][j].state = DEAD;
+					new_grid[i][j].state = DEAD;
 					break;
 			}
+		}
+	}
+	for(size_t i=0; i<HEIGHT; i++){
+		for(size_t j=0; j<WIDTH; j++){
+			grid[i][j] = new_grid[i][j];
 		}
 	}
 }
@@ -80,19 +98,45 @@ int print_grid(){
 }
 
 
-int main(){
-	init_grid();
-	for(size_t i=0; i<HEIGHT/5; i++){
-		for(size_t j=0; j<HEIGHT/5; j++){
-			grid[i][j].state = ALIVE;
+void init_glider(size_t offset){
+	grid[offset+0][offset+1].state = ALIVE;
+	grid[offset+1][offset+2].state = ALIVE;
+	grid[offset+2][offset+0].state = ALIVE;
+	grid[offset+2][offset+1].state = ALIVE;
+	grid[offset+2][offset+2].state = ALIVE;
+}
+
+
+int main(int argc, char *argv[]){
+	char *program = argv[0];
+	srand(time(NULL));
+	system("clear");
+	if(argc < 2 || strcmp(argv[1], "default")==0){
+		init_grid(1);
+		while(print_grid() != 0){
+			usleep(SPEED*1000);
+			gen_next();
+			system("clear");
 		}
+	}else if(strcmp(argv[1], "glider") == 0){
+		init_grid(0);
+		init_glider(0);
+		while(print_grid() != 0){
+			usleep(SPEED*1000);
+			gen_next();
+			system("clear");
+		}
+	}else if(strcmp(argv[1], "both") == 0){
+		init_grid(1);
+		init_glider(0);
+		while(print_grid() != 0){
+			usleep(SPEED*1000);
+			gen_next();
+			system("clear");
+		}
+	}else{
+		fprintf(stderr, "usage: %s <default || glider || both>\n", program);
+		exit(1);
 	}
-
-	while(print_grid() != 0){
-		usleep(SPEED*1000);
-		gen_next();
-		system("clear");
-	}
-
 	return 0;
 }
