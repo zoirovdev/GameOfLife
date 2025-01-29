@@ -5,20 +5,42 @@
 #include <string.h>
 
 
-#define WIDTH 50
-#define HEIGHT 25
+#define WIDTH 100
+#define HEIGHT 50
+
 #define BACKGROUND '-'
-#define CELL 'E'
-#define SPEED 50
+#define CELL '#'
+#define ALMOST_DEAD '*'
+
+#define SPEED 250
+
 
 typedef enum {
 	DEAD,
-	ALIVE
+	ALIVE,
+	DYING
 } State;
 
 typedef struct {
 	State state;
 } Cell;
+
+State gol[2][9] = {
+	{DEAD, DEAD, DEAD, ALIVE, DEAD, DEAD, DEAD, DEAD, DEAD},
+	{DEAD, DEAD, ALIVE, ALIVE, DEAD, DEAD, DEAD, DEAD, DEAD},
+};
+
+State seeds[2][9] = {
+	{DEAD, DEAD, ALIVE, DEAD, DEAD, DEAD, DEAD, DEAD, DEAD},
+	{DEAD, DEAD, DEAD, DEAD, DEAD, DEAD, DEAD, DEAD, DEAD},
+};
+
+State brain[3][9] = {
+	{DEAD, DEAD, ALIVE, DEAD, DEAD, DEAD, DEAD, DEAD, DEAD},
+	{DYING, DYING, DYING, DYING, DYING, DYING, DYING, DYING, DYING},
+	{DEAD, DEAD, DEAD, DEAD, DEAD, DEAD, DEAD, DEAD, DEAD}
+};
+
 
 Cell grid[HEIGHT][WIDTH] = {0};
 
@@ -35,13 +57,9 @@ void init_grid(int random){
 }
 
 
-void gen_next(){
+void gen_next(State automaton[2][9]){
 	Cell new_grid[HEIGHT][WIDTH] = {0};
-	for(size_t i=0; i<HEIGHT; i++){
-		for(size_t j=0; j<WIDTH; j++){
-			new_grid[i][j] = grid[i][j];
-		}
-	}
+	memcpy(new_grid, grid, sizeof(Cell) * HEIGHT * WIDTH);
 	for(size_t i=0;i<HEIGHT;i++){
 		for(size_t j=0;j<WIDTH;j++){
 			int alive_count = 0;
@@ -55,28 +73,10 @@ void gen_next(){
 					}
 				}
 			}
-			switch(alive_count){
-				case 0:
-				case 1:
-					new_grid[i][j].state = DEAD;
-					break;
-				case 2:
-				case 3:
-					if(grid[i][j].state == DEAD && alive_count == 3){
-						new_grid[i][j].state = ALIVE;
-					}
-					break;
-				default:
-					new_grid[i][j].state = DEAD;
-					break;
-			}
+			new_grid[i][j].state = automaton[grid[i][j].state][alive_count];
 		}
 	}
-	for(size_t i=0; i<HEIGHT; i++){
-		for(size_t j=0; j<WIDTH; j++){
-			grid[i][j] = new_grid[i][j];
-		}
-	}
+	memcpy(new_grid, grid, sizeof(Cell) * HEIGHT * WIDTH);
 }
 
 
@@ -84,11 +84,16 @@ int print_grid(){
 	int alive_count = 0;
 	for(size_t i=0;i<HEIGHT;i++){
 		for(size_t j=0;j<WIDTH;j++){
-			if(grid[i][j].state==ALIVE){
-				alive_count++;
-				printf("%c", CELL);
-			} else {
-				printf("%c", BACKGROUND);
+			switch(grid[i][j].state){
+				case ALIVE:
+					alive_count++;
+					printf("%c", CELL);
+					break;
+				case DEAD:
+					printf("%c", BACKGROUND);
+					break;
+				case DYING:
+					printf("%c", ALMOST_DEAD);
 			}
 		}
 		printf("\n");
@@ -106,24 +111,36 @@ void init_glider(size_t offset){
 	grid[offset+2][offset+2].state = ALIVE;
 }
 
+void init_oscillator(size_t offset){
+	grid[offset/2+0][5].state = ALIVE;
+	grid[offset/2+0][6].state = ALIVE;
+	grid[offset/2+1][5].state = ALIVE;
+	grid[offset/2+1][6].state = ALIVE;
+	grid[offset/2+1][4].state = DYING;
+	grid[offset/2+0][7].state = DYING;
+	grid[offset/2-1][5].state = DYING;
+	grid[offset/2+2][6].state = DYING;
+}
 
 int main(int argc, char *argv[]){
 	char *program = argv[0];
 	srand(time(NULL));
 	system("clear");
+	init_grid(0);
+	init_oscillator(5);
+	while(print_grid() != 0){
+		usleep(SPEED*1000);
+		gen_next(brain);
+		system("clear");
+	}
+	return 0;
 	if(argc < 2 || strcmp(argv[1], "default")==0){
-		init_grid(1);
-		while(print_grid() != 0){
-			usleep(SPEED*1000);
-			gen_next();
-			system("clear");
-		}
 	}else if(strcmp(argv[1], "glider") == 0){
 		init_grid(0);
 		init_glider(0);
 		while(print_grid() != 0){
 			usleep(SPEED*1000);
-			gen_next();
+			gen_next(gol);
 			system("clear");
 		}
 	}else if(strcmp(argv[1], "both") == 0){
@@ -131,7 +148,7 @@ int main(int argc, char *argv[]){
 		init_glider(0);
 		while(print_grid() != 0){
 			usleep(SPEED*1000);
-			gen_next();
+			gen_next(gol);
 			system("clear");
 		}
 	}else{
