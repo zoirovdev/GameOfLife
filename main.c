@@ -15,11 +15,21 @@
 #define SPEED 250
 
 
+
+
 typedef enum {
 	DEAD,
 	ALIVE,
 	DYING
 } State;
+
+typedef State cur[9];
+
+typedef enum {
+	GOL,
+	SEEDS,
+	BRAIN
+} Automaton;
 
 typedef struct {
 	State state;
@@ -40,6 +50,7 @@ State brain[3][9] = {
 	{DYING, DYING, DYING, DYING, DYING, DYING, DYING, DYING, DYING},
 	{DEAD, DEAD, DEAD, DEAD, DEAD, DEAD, DEAD, DEAD, DEAD}
 };
+
 
 
 Cell grid[HEIGHT][WIDTH] = {0};
@@ -122,38 +133,89 @@ void init_oscillator(size_t offset){
 	grid[offset/2+2][6].state = DYING;
 }
 
-int main(int argc, char *argv[]){
-	char *program = argv[0];
-	srand(time(NULL));
-	system("clear");
-	init_grid(0);
-	init_oscillator(5);
-	while(print_grid() != 0){
-		usleep(SPEED*1000);
-		gen_next(brain);
-		system("clear");
-	}
-	return 0;
-	if(argc < 2 || strcmp(argv[1], "default")==0){
-	}else if(strcmp(argv[1], "glider") == 0){
-		init_grid(0);
-		init_glider(0);
-		while(print_grid() != 0){
-			usleep(SPEED*1000);
-			gen_next(gol);
-			system("clear");
-		}
-	}else if(strcmp(argv[1], "both") == 0){
-		init_grid(1);
-		init_glider(0);
-		while(print_grid() != 0){
-			usleep(SPEED*1000);
-			gen_next(gol);
-			system("clear");
-		}
-	}else{
-		fprintf(stderr, "usage: %s <default || glider || both>\n", program);
+void usage(char *program){
+	fprintf(stderr, "usage: %s <gol | seeds | brain> -r -o <glider & oscillator> \n", program);
+	exit(1);
+}
+
+int main(int argc, char **argv){
+	(void)argc;
+	char *program = *argv + 0;
+	char *automaton_input = *(++argv);
+	int automaton = GOL;
+	int glider = 0;
+	int oscillator = 0;
+	int random = 0;
+
+	if(automaton_input == NULL){
 		exit(1);
 	}
+
+	if(strcmp(automaton_input, "gol") == 0){
+		automaton = GOL;
+	}else if(strcmp(automaton_input, "seeds") == 0){
+		automaton = SEEDS;
+	}else if(strcmp(automaton_input, "bbrain") == 0){
+		automaton = BRAIN;
+	}else{
+		usage(program);
+	}
+
+	while(*(++argv) != NULL){
+		char *flag = *(argv);
+		if(strcmp(flag, "-r") == 0){
+			random = -1;
+		} 
+		if(strcmp(flag, "-o") == 0){
+			if(*(argv+1) == NULL){
+				usage(program);
+			}
+			while(*(++argv) != NULL){
+				char *option = *(argv);
+				if(!glider){
+					glider = strcmp(option, "glider") == 0;
+				}
+				if(!oscillator){
+					oscillator = strcmp(option, "oscillator") == 0;
+				}
+			}
+		}else{
+			continue;
+		}
+	}
+	
+	srand(time(NULL));
+	init_grid(random);
+	printf("%d\n", automaton);
+	printf("%d\n", random);
+	printf("%d\n", glider);
+	printf("%d\n", oscillator);
+	init_grid(random);
+	if(glider){
+		init_glider(5);
+	}
+	if(oscillator){
+		init_oscillator(5);
+	}
+
+	cur *current_state = gol;
+	switch(automaton){
+		case GOL:
+			current_state = gol;
+			break;
+		case SEEDS:
+			current_state = seeds;
+			break;
+		case BRAIN:
+			current_state = brain;
+			break;
+	}
+
+	while(print_grid() != 0){
+		usleep(SPEED * 1000);
+		gen_next(current_state);
+		system("clear");
+	}
+
 	return 0;
 }
